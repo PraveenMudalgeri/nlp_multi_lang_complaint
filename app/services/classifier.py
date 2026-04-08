@@ -3,8 +3,15 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
+try:
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.model_selection import train_test_split
+
+    SKLEARN_AVAILABLE = True
+except Exception:
+    LogisticRegression = None  # type: ignore[assignment]
+    train_test_split = None  # type: ignore[assignment]
+    SKLEARN_AVAILABLE = False
 
 try:
     from app.services.evaluation import compute_classification_metrics
@@ -18,10 +25,35 @@ except ModuleNotFoundError:
 
 @dataclass
 class ComplaintClassifierArtifacts:
-    classifier: LogisticRegression
+    classifier: object | None
     feature_engineer: FeatureEngineer
     labels: list[str]
     metrics: dict[str, float]
+
+
+FALLBACK_TYPE_KEYWORDS = {
+    "road": ["road", "pothole", "street", "highway"],
+    "water": ["water", "sewage", "drain", "pipeline", "tap"],
+    "garbage": ["garbage", "waste", "trash", "dump"],
+    "electricity": ["electricity", "power", "voltage", "transformer", "outage"],
+}
+
+
+def _predict_with_keywords(text: str) -> tuple[str, float]:
+    lowered = (text or "").lower()
+    best_label = "general"
+    best_score = 0
+
+    for label, words in FALLBACK_TYPE_KEYWORDS.items():
+        score = sum(1 for word in words if word in lowered)
+        if score > best_score:
+            best_label = label
+            best_score = score
+
+    if best_score == 0:
+        return "general", 0.0
+    confidence = min(0.9, 0.25 + (best_score * 0.2))
+    return best_label, confidence
 
 
 def _dataset_path() -> Path:
@@ -47,6 +79,14 @@ def _load_dataset() -> list[dict[str, str]]:
 
 @lru_cache(maxsize=1)
 def get_trained_classifier() -> ComplaintClassifierArtifacts:
+    if not SKLEARN_AVAILABLE:
+        return ComplaintClassifierArtifacts(
+            classifier=None,
+            feature_engineer=FeatureEngineer(max_features=1200),
+            labels=["road", "water", "garbage", "electricity", "general"],
+            metrics={"accuracy": 0.0, "precision": 0.0, "recall": 0.0},
+        )
+
     rows = _load_dataset()
     texts = [preprocess_for_model(str(row.get("text", ""))) for row in rows]
     labels = [str(row.get("label", "general")) for row in rows]
@@ -88,6 +128,9 @@ def predict_complaint_type(text: str) -> str:
 def predict_with_confidence(text: str) -> tuple[str, float]:
     if not text or not text.strip():
         return "general", 0.0
+
+    if not SKLEARN_AVAILABLE:
+        return _predict_with_keywords(text)
 
     artifacts = get_trained_classifier()
     processed = preprocess_for_model(text)

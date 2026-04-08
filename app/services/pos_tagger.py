@@ -10,7 +10,19 @@ except ModuleNotFoundError:
 
 def pos_tag_text(text: str) -> list[tuple[str, str]]:
     processed = preprocess_text(text)
-    return nltk.pos_tag(processed.word_tokens)
+    try:
+        return nltk.pos_tag(processed.word_tokens)
+    except Exception:
+        # Fallback heuristic tags when NLTK tagger models are unavailable.
+        tagged: list[tuple[str, str]] = []
+        for token in processed.word_tokens:
+            if token[:1].isupper():
+                tagged.append((token, "NNP"))
+            elif token.endswith("ing") or token.endswith("ed"):
+                tagged.append((token, "VB"))
+            else:
+                tagged.append((token, "NN"))
+        return tagged
 
 
 def extract_nouns_and_verbs(text: str) -> dict[str, list[str]]:

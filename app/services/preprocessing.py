@@ -1,6 +1,7 @@
 import re
 import unicodedata
 from dataclasses import dataclass
+import os
 
 import nltk
 from nltk.corpus import stopwords
@@ -20,6 +21,33 @@ _NLTK_RESOURCE_MAP = {
 _PUNCT_PATTERN = re.compile(r"[^\w\s]")
 _nltk_ready = False
 
+_FALLBACK_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "by",
+    "for",
+    "from",
+    "has",
+    "in",
+    "is",
+    "it",
+    "of",
+    "on",
+    "or",
+    "that",
+    "the",
+    "to",
+    "was",
+    "were",
+    "will",
+    "with",
+}
+
 
 @dataclass(frozen=True)
 class PreprocessingResult:
@@ -38,13 +66,49 @@ def ensure_nltk_resources() -> None:
     if _nltk_ready:
         return
 
+    allow_download = os.getenv("NLTK_AUTO_DOWNLOAD", "0") == "1"
+
     for package, resource_path in _NLTK_RESOURCE_MAP.items():
         try:
             nltk.data.find(resource_path)
         except LookupError:
-            nltk.download(package, quiet=True)
+            if allow_download:
+                try:
+                    nltk.download(package, quiet=True)
+                except Exception:
+                    pass
 
     _nltk_ready = True
+
+
+def _safe_sent_tokenize(text: str) -> list[str]:
+    try:
+        return sent_tokenize(text)
+    except Exception:
+        chunks = re.split(r"(?<=[.!?])\s+", text.strip()) if text.strip() else []
+        return [chunk for chunk in chunks if chunk]
+
+
+def _safe_word_tokenize(text: str) -> list[str]:
+    try:
+        return word_tokenize(text)
+    except Exception:
+        return re.findall(r"\b\w+\b", text)
+
+
+def _safe_stopwords(language: str) -> set[str]:
+    try:
+        return set(stopwords.words(language))
+    except Exception:
+        return _FALLBACK_STOPWORDS
+
+
+def _safe_lemmatize(tokens: list[str]) -> list[str]:
+    try:
+        lemmatizer = WordNetLemmatizer()
+        return [lemmatizer.lemmatize(token) for token in tokens]
+    except Exception:
+        return tokens
 
 
 def normalize_unicode(text: str) -> str:
@@ -62,14 +126,13 @@ def preprocess_text(text: str, language: str = "english") -> PreprocessingResult
     lowered = normalized.lower().strip()
     punctuation_removed = _remove_punctuation(lowered)
 
-    sentences = sent_tokenize(normalized)
-    word_tokens = word_tokenize(punctuation_removed)
+    sentences = _safe_sent_tokenize(normalized)
+    word_tokens = _safe_word_tokenize(punctuation_removed)
 
-    stop_words = set(stopwords.words(language))
+    stop_words = _safe_stopwords(language)
     filtered_tokens = [token for token in word_tokens if token.isalpha() and token not in stop_words]
 
-    lemmatizer = WordNetLemmatizer()
-    lemmatized_tokens = [lemmatizer.lemmatize(token) for token in filtered_tokens]
+    lemmatized_tokens = _safe_lemmatize(filtered_tokens)
 
     return PreprocessingResult(
         original_text=text,

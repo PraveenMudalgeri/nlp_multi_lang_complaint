@@ -13,25 +13,29 @@ SEED_TERMS = {
     "garbage": {"garbage", "waste", "trash", "litter", "dump"},
 }
 
-
-ensure_nltk_resources()
-
-
 def get_synonyms(word: str, max_synonyms: int = 10) -> list[str]:
+    ensure_nltk_resources()
     synonyms: set[str] = set()
-    for synset in wn.synsets(word):
-        for lemma in synset.lemmas():
-            name = lemma.name().replace("_", " ").lower()
-            if name.isascii():
-                synonyms.add(name)
-            if len(synonyms) >= max_synonyms:
-                return sorted(synonyms)
+    try:
+        for synset in wn.synsets(word):
+            for lemma in synset.lemmas():
+                name = lemma.name().replace("_", " ").lower()
+                if name.isascii():
+                    synonyms.add(name)
+                if len(synonyms) >= max_synonyms:
+                    return sorted(synonyms)
+    except Exception:
+        return []
     return sorted(synonyms)
 
 
 def semantic_similarity(word_a: str, word_b: str) -> float:
-    synsets_a = wn.synsets(word_a)
-    synsets_b = wn.synsets(word_b)
+    ensure_nltk_resources()
+    try:
+        synsets_a = wn.synsets(word_a)
+        synsets_b = wn.synsets(word_b)
+    except Exception:
+        return 0.0
     best_score = 0.0
 
     for syn_a in synsets_a:
