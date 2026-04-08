@@ -318,7 +318,7 @@ export default function OutputBox({ output, error, metrics }: OutputBoxProps) {
       {metrics && (
         <div className="mt-5 rounded-2xl border border-teal-100/20 bg-[#06161d] p-4 text-xs text-[#b5d9d3]">
           <p className="uppercase tracking-[0.16em] text-[#7baaa3]">
-            Classifier Metrics
+            Model Metrics (Global)
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <span className="rounded-full border border-emerald-200/35 bg-emerald-300/10 px-3 py-1 text-emerald-100">
@@ -331,6 +331,9 @@ export default function OutputBox({ output, error, metrics }: OutputBoxProps) {
               Recall: {metrics.recall.toFixed(2)}
             </span>
           </div>
+          <p className="mt-2 text-[11px] text-[#86ada7]">
+            These are dataset-level evaluation scores, so they remain constant across requests.
+          </p>
         </div>
       )}
 
@@ -351,6 +354,12 @@ export default function OutputBox({ output, error, metrics }: OutputBoxProps) {
             </span>
             <span className="rounded-full border border-sky-200/35 bg-sky-200/10 px-3 py-1 text-sky-50">
               Location: {output.location}
+            </span>
+            <span className="rounded-full border border-violet-200/35 bg-violet-200/10 px-3 py-1 text-violet-50">
+              Confidence: {(output.classification_confidence ?? 0).toFixed(2)}
+            </span>
+            <span className="rounded-full border border-rose-200/35 bg-rose-200/10 px-3 py-1 text-rose-50">
+              Method: {output.classification_method ?? "default"}
             </span>
           </div>
 

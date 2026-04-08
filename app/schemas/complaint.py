@@ -11,3 +11,5 @@ class ComplaintResponse(BaseModel):
     complaint_type: str
     location: str
     final_output: str
+    classification_confidence: float | None = None
+    classification_method: str | None = None

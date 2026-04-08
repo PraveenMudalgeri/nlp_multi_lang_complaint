@@ -44,23 +44,29 @@ def _rule_based_type(text: str) -> tuple[str, int]:
     return best_type, best_score
 
 
-def extract_complaint_type(text: str) -> str:
+def classify_with_hybrid_signals(text: str) -> tuple[str, float, str]:
     ml_type, ml_confidence = predict_with_confidence(text)
     rule_type, rule_score = _rule_based_type(text)
 
     if ml_type in ALLOWED_TYPES and ml_confidence >= 0.45:
-        return ml_type
+        return ml_type, float(round(ml_confidence, 4)), "ml"
 
     if rule_score > 0:
-        return rule_type
+        rule_conf = min(0.95, 0.3 + (rule_score * 0.2))
+        return rule_type, float(round(rule_conf, 4)), "rule"
 
     nouns = extract_nouns_and_verbs(text).get("nouns", [])
     for noun in nouns:
         mapped = map_to_domain(noun)
         if mapped:
-            return mapped
+            return mapped, 0.35, "semantic"
 
-    return "general"
+    return "general", 0.2, "default"
+
+
+def extract_complaint_type(text: str) -> str:
+    complaint_type, _, _ = classify_with_hybrid_signals(text)
+    return complaint_type
 
 
 def validate_complaint_type(complaint_type: str, text: str) -> str:
@@ -103,7 +109,7 @@ def extract_location(text: str) -> str:
 
 
 def extract_complaint_details(text: str) -> dict[str, str]:
-    extracted_type = extract_complaint_type(text)
+    extracted_type, confidence, method = classify_with_hybrid_signals(text)
     complaint_type = validate_complaint_type(extracted_type, text)
     location = extract_location(text)
     linguistic = extract_nouns_and_verbs(text)
@@ -116,4 +122,6 @@ def extract_complaint_details(text: str) -> dict[str, str]:
         "complaint_type": complaint_type,
         "location": location,
         "issue_verbs": ", ".join(issue_verbs[:4]) if issue_verbs else "",
+        "classification_confidence": f"{confidence:.4f}",
+        "classification_method": method,
     }

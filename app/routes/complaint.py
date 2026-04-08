@@ -81,6 +81,8 @@ async def process_complaint(payload: ComplaintRequest) -> ComplaintResponse:
             complaint_type=details["complaint_type"],
             location=details["location"],
             final_output=final_output,
+            classification_confidence=float(details.get("classification_confidence", "0") or 0),
+            classification_method=details.get("classification_method", "default"),
         )
     except HTTPStatusError as exc:
         detail = exc.response.text if exc.response is not None else str(exc)

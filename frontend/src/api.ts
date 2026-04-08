@@ -8,6 +8,8 @@ export type ComplaintResponse = {
   complaint_type: string;
   location: string;
   final_output: string;
+  classification_confidence?: number;
+  classification_method?: string;
 };
 
 export type ClassifierMetrics = {
